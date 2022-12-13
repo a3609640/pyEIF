@@ -5,30 +5,94 @@ Created on Mon Nov  9 14:48:10 2020
 
 @author: suwu
 """
+import os
+import pandas
 
 
-# retrieve published proteomics data ######
-def ccle_pro():
+class CCLEProteomicData:
+  """This class contains proteomic data and defines methods for working with it.
+
+  This class is instantiated from a CSV file, from which it selects a subset
+  of rows relevant for this project.  Once an instance has been created, it
+  can be asked to print the columns it selected or draw a scatterplot of the
+  data in those columns. It can also yield its data via get_ccle_pro_subset(),
+  for use in purposes not yet incorporated into methods of the class itself.
+  """
+  # TODO(suwu): Probably eif_corr_sum() and the pandas.series() call below should
+  # be implemented as method of this class.
+
+  # TODO(dlroxe): These really should be set up as command-line args,
+  # rather than as plain-old global data or class variables.
+  _data_file_directory = "~/Documents/Bioinformatics_analysis/eIF4G-analysis/eIF4G_data"
+  _output_directory = "~/Documents/Bioinformatics_analysis/eIF4G-analysis/eIF4G_output"
+  _data_output_directory = "~/Documents/Bioinformatics_analysis/eIF4G-analysis/eIF4G_output/ProcessedData"
+  _input_data = os.path.join(
+      _data_file_directory, "protein_quant_current_normalized.csv")
+
+  def __init__(self):
+    # retrieve published proteomics data ######
+    self._ccle_pro_subset = self._init_ccle_pro_subset()
+
+  def _init_ccle_pro_subset(self):
     # download the proteomics data
     # https://gygi.hms.harvard.edu/data/ccle/protein_quant_current_normalized.csv.gz
-    CCLE_PRO = pandas.read_csv(os.path.join(data_file_directory, 
-                                            "protein_quant_current_normalized.csv"))
+    ccle_pro = pandas.read_csv(self._input_data)
     # concatenate the Gene_Symbol (with duplicate names) and the Uniprot_Acc
-    CCLE_PRO["Gene_Symbol"] = (CCLE_PRO["Gene_Symbol"].fillna("") + " " + CCLE_PRO["Uniprot_Acc"])
-    CCLE_PRO = CCLE_PRO.set_index("Gene_Symbol")
-    CCLE_PRO_subset = CCLE_PRO[CCLE_PRO.columns.drop(list(CCLE_PRO.filter(regex="Peptides")))]
-    CCLE_PRO_subset = CCLE_PRO_subset.drop(columns=["Protein_Id", 
-                                                    "Description", 
-                                                    "Group_ID", 
-                                                    "Uniprot", 
+    ccle_pro["Gene_Symbol"] = (ccle_pro["Gene_Symbol"].fillna("") + " " + ccle_pro["Uniprot_Acc"])
+    ccle_pro = ccle_pro.set_index("Gene_Symbol")
+    ccle_pro_subset = ccle_pro[ccle_pro.columns.drop(list(ccle_pro.filter(regex="Peptides")))]
+    ccle_pro_subset = ccle_pro_subset.drop(columns=["Protein_Id",
+                                                    "Description",
+                                                    "Group_ID",
+                                                    "Uniprot",
                                                     "Uniprot_Acc"]).T
-    CCLE_PRO_subset.index.names = ["ccle_name"]
-    return CCLE_PRO_subset
+    ccle_pro_subset.index.names = ["ccle_name"]
+    return ccle_pro_subset
 
-CCLE_PRO_subset = ccle_pro()
+    def print_eif_columns(self):
+      print([
+        col for col in self._ccle_pro_subset.columns
+        if "EIF3" in col
+      ])
+
+    def scatterplot(proteins):
+      CCLE_EIF_PRO = self._ccle_pro_subset[proteins]
+      CCLE_EIF_PRO.index.name = 'ccle'
+      CCLE_EIF_PRO.reset_index(inplace=True)
+      CCLE_EIF_PRO["ccle"] = CCLE_EIF_PRO["ccle"].str.split("_").str[1]
+      CCLE_EIF_PRO.dropna(inplace=True)
+      matplotlib.rcParams.update({'font.size': 12})
+      g = seaborn.PairGrid(CCLE_EIF_PRO)
+      # g.map(sbn.scatterplot)
+      g.map_diag(seaborn.histplot)
+      # g.map_lower(sbn.scatterplot)
+      g.map_lower(seaborn.regplot)
+      g.map_upper(reg_coef)
+      g.tight_layout
+      # g.add_legend()
+      seaborn.set_style("ticks")
+      matplotlib.pyplot.show()
+      matplotlib.pyplot.savefig(os.path.join(os.path.expanduser(output_directory), "Fig3",
+                                             "CCLE_scatter.pdf"), dpi=300)
+      # scatter plot of two protein expression across cell lines with color
+      g = seaborn.PairGrid(CCLE_EIF_PRO, hue="ccle", diag_sharey=False, corner=True)
+      g.map_lower(seaborn.scatterplot)
+      g.map_diag(seaborn.histplot)
+      g.map_upper(reg_coef)
+      g.tight_layout
+      g.add_legend()
+      matplotlib.pyplot.savefig(os.path.join(os.path.expanduser(output_directory), "Fig3",
+                                             "CCLE_color_scatter.pdf"), dpi=300)
+      matplotlib.pyplot.show()
+
+  def get_ccle_pro_subset(self):
+    return self._ccle_pro_subset
+
+# TODO(dlroxe): This perhaps (probably?) needs a better name, both
+# for the class and for the instance.
+CCLE_PROTEOMIC_DATA = CCLEProteomicData()
 
 
-os.path.join(data_file_directory, "CRISPR_gene_effect.csv")
 # retrieve published depmap data ######
 def dep_crispr():
   ccle_dep_crispr = pandas.read_csv(os.path.join(data_file_directory, "CRISPR_gene_effect.csv"))
@@ -50,12 +114,10 @@ def dep_rnai():
 
 ccle_dep_rnai = dep_rnai()
 
-##
-# find eif containing columns
-EIF_cols = [col for col in CCLE_PRO_subset.columns if "EIF3" in col]
-print(EIF_cols)
 
-EIF2 = pandas.Series(["EIF4G1 Q04637-9", "EIF4A1 P60842", "EIF4E P06730-2", 
+CCLE_PROTEOMIC_DATA.print_eif_columns()
+
+EIF2 = pandas.Series(["EIF4G1 Q04637-9", "EIF4A1 P60842", "EIF4E P06730-2",
                       "EIF4EBP1 Q13541", 'EIF3E P60228', 'EIF3H O15372'])
 
 
@@ -71,37 +133,8 @@ def reg_coef(x, y, label=None, color=None, **kwargs):
     )
     ax.set_axis_off()
 
-def eif_ccle_scatter(data, proteins):
-    CCLE_EIF_PRO = data[proteins]
-    CCLE_EIF_PRO.index.name = 'ccle'
-    CCLE_EIF_PRO.reset_index(inplace=True)
-    CCLE_EIF_PRO["ccle"] = CCLE_EIF_PRO["ccle"].str.split("_").str[1]
-    CCLE_EIF_PRO.dropna(inplace=True)
-    matplotlib.rcParams.update({'font.size': 12})
-    g = seaborn.PairGrid(CCLE_EIF_PRO)
-    # g.map(sbn.scatterplot)
-    g.map_diag(seaborn.histplot)
-    # g.map_lower(sbn.scatterplot)
-    g.map_lower(seaborn.regplot)
-    g.map_upper(reg_coef)
-    g.tight_layout
-    #g.add_legend()
-    seaborn.set_style("ticks")
-    matplotlib.pyplot.show()
-    matplotlib.pyplot.savefig(os.path.join(os.path.expanduser(output_directory), "Fig3",
-    "CCLE_scatter.pdf"), dpi=300)
-    # scatter plot of two protein expression across cell lines with color
-    g = seaborn.PairGrid(CCLE_EIF_PRO, hue="ccle", diag_sharey=False, corner = True)
-    g.map_lower(seaborn.scatterplot)
-    g.map_diag(seaborn.histplot)
-    g.map_upper(reg_coef)
-    g.tight_layout
-    g.add_legend()
-    matplotlib.pyplot.savefig(os.path.join(os.path.expanduser(output_directory), "Fig3",
-    "CCLE_color_scatter.pdf"), dpi=300)
-    matplotlib.pyplot.show()
 
-eif_ccle_scatter(data = CCLE_PRO_subset, proteins = EIF2)
+CCLE_PROTEOMIC_DATA.scatterplot(proteins=EIF2)
 
 
 # identify CORs for eIF4F ######
@@ -119,7 +152,7 @@ def eif_corr_sum(df, gene_list):
     z = y[y.ge(0.5).any(axis=1)|y.le(-0.5).any(axis=1)]
     return (y, z)
 
-EIF_COR_PRO, EIF_COR_PRO_sig = eif_corr_sum(df = CCLE_PRO_subset, gene_list = EIF2)
+EIF_COR_PRO, EIF_COR_PRO_sig = eif_corr_sum(df = CCLE_PROTEOMIC_DATA.get_ccle_pro_subset(), gene_list = EIF2)
 EIF_COR_PRO_sig.to_csv(os.path.join(os.path.expanduser(output_directory),"ProcessedData","EIF_COR_PRO_sig.csv"))
 
 
@@ -137,7 +170,7 @@ h = seaborn.clustermap(
 )
 matplotlib.pyplot.show()
 matplotlib.pyplot.savefig(os.path.join(os.path.expanduser(output_directory), "Fig3",
-"COR_heatmap.pdf"), 
+"COR_heatmap.pdf"),
 dpi=300)
 
 
@@ -179,7 +212,7 @@ def protein_interaction_reference():
   HuRI = HuRI.dropna()  # some na in 'protein2' column, remove them
   # chose experimental and database values over 1
   HuRI = HuRI[(HuRI['experimental'] != 0) & (HuRI['database'] != 0)]
-  CCLE_pro = pandas.Series(CCLE_PRO_subset.columns).apply(lambda x: x.split(' ')[0])
+  CCLE_pro = pandas.Series(CCLE_PROTEOMIC_DATA.get_ccle_pro_subset().columns).apply(lambda x: x.split(' ')[0])
   HuRI_CCLE = HuRI[HuRI['protein1'].isin(CCLE_pro) & HuRI['protein2'].isin(CCLE_pro)]
   HuRI_CCLE = HuRI_CCLE.dropna()
   #HuRI_CCLE[HuRI_CCLE['protein1'] != HuRI_CCLE['protein2']]
@@ -191,10 +224,10 @@ HuRI, HuRI_CCLE = protein_interaction_reference()
 EIF_COR_sig = pandas.DataFrame(EIF_COR_PRO_sig.index.str.split(" ").str[0]).dropna()
 EIF_COR_sig.columns = ['gene']
 
-cluster1 = pandas.read_csv(os.path.join(os.path.expanduser(output_directory),"ProcessedData", "cluster1.csv")) 
+cluster1 = pandas.read_csv(os.path.join(os.path.expanduser(output_directory),"ProcessedData", "cluster1.csv"))
 cluster2 = pandas.read_csv(os.path.join(os.path.expanduser(output_directory),"ProcessedData", "cluster2.csv"))
-cluster3 = pandas.read_csv(os.path.join(os.path.expanduser(output_directory),"ProcessedData", "cluster3.csv")) 
-cluster4 = pandas.read_csv(os.path.join(os.path.expanduser(output_directory),"ProcessedData", "cluster4.csv")) 
+cluster3 = pandas.read_csv(os.path.join(os.path.expanduser(output_directory),"ProcessedData", "cluster3.csv"))
+cluster4 = pandas.read_csv(os.path.join(os.path.expanduser(output_directory),"ProcessedData", "cluster4.csv"))
 
 cluster_Net = HuRI_CCLE[HuRI_CCLE['protein1'].isin(EIF_COR_sig['gene']) & HuRI_CCLE['protein2'].isin(EIF_COR_sig['gene'])]
 cluster1_Net = HuRI_CCLE[HuRI_CCLE['protein1'].isin(cluster1['gene']) & HuRI_CCLE['protein2'].isin(cluster1['gene'])]
@@ -218,22 +251,22 @@ C1 = networkx.from_pandas_edgelist(cluster1_Net,
                                 'protein1',
                                 'protein2',
                                 # edge_attr = ['experimental','database']
-                                )     
+                                )
 C2 = networkx.from_pandas_edgelist(cluster2_Net,
                                 'protein1',
                                 'protein2',
                                 # edge_attr = ['experimental','database']
-                                )                                       
+                                )
 C3 = networkx.from_pandas_edgelist(cluster3_Net,
                                 'protein1',
                                 'protein2',
                                 # edge_attr = ['experimental','database']
-                                )     
+                                )
 C4 = networkx.from_pandas_edgelist(cluster4_Net,
                                 'protein1',
                                 'protein2',
                                 # edge_attr = ['experimental','database']
-                                )                                     
+                                )
 
 #pos = networkx.kamada_kawai_layout(G)
 posC = networkx.kamada_kawai_layout(C)
@@ -244,64 +277,64 @@ def plot_combined_cluster_net():
   matplotlib.pyplot.axis('off')
   networkx.draw_networkx(C,
                          posC,
-                           width= 0.5, 
-                           node_color ='#cccccc', 
+                           width= 0.5,
+                           node_color ='#cccccc',
                            edge_color="#cccccc",
-                           node_size = 5, 
+                           node_size = 5,
                            with_labels = False,
-                           connectionstyle="arc3,rad=0.5")   
+                           connectionstyle="arc3,rad=0.5")
   networkx.draw_networkx(C1,
-                           posC, 
-                           width= 0.5, 
-                           node_color ='green', 
+                           posC,
+                           width= 0.5,
+                           node_color ='green',
                            edge_color="lightgreen",
-                           node_size = 5, 
+                           node_size = 5,
                            label='cluster 1',
                            with_labels = False,
-                           connectionstyle="arc3,rad=0.5") 
+                           connectionstyle="arc3,rad=0.5")
   networkx.draw_networkx(C2,
-                           posC, 
-                           width= 0.5, 
-                           node_color ='orange', 
+                           posC,
+                           width= 0.5,
+                           node_color ='orange',
                            edge_color="gold",
-                           node_size = 5, 
+                           node_size = 5,
                            label='cluster 2',
                            with_labels = False,
-                           connectionstyle="arc3,rad=0.5")            
+                           connectionstyle="arc3,rad=0.5")
   networkx.draw_networkx(C3,
-                           posC, 
-                           width= 0.5, 
-                           node_color ='blue', 
+                           posC,
+                           width= 0.5,
+                           node_color ='blue',
                            edge_color="skyblue",
-                           node_size = 5, 
+                           node_size = 5,
                            label='cluster 3',
                            with_labels = False,
-                           connectionstyle="arc3,rad=0.5")            
+                           connectionstyle="arc3,rad=0.5")
   networkx.draw_networkx(C4,
-                           posC, 
-                           width= 0.5, 
-                           node_color ='red', 
+                           posC,
+                           width= 0.5,
+                           node_color ='red',
                            edge_color="pink",
-                           node_size = 5, 
+                           node_size = 5,
                            label='cluster 4',
                            with_labels = False,
-                           connectionstyle="arc3,rad=0.5")                                  
+                           connectionstyle="arc3,rad=0.5")
   matplotlib.pyplot.legend()
   matplotlib.pyplot.tight_layout()
   matplotlib.pyplot.savefig(os.path.join(os.path.expanduser(output_directory), "Fig3",'CORs_network_kk.pdf'),
                     dpi=300,
                     edgecolor='w',
                     #transparent=True,
-                    bbox_inches='tight')   
+                    bbox_inches='tight')
   matplotlib.pyplot.show()
 plot_combined_cluster_net()
 
 ##
 def plot_cluster_net_depscore(cluster, label, pos, edge_color, node_color):
   df1 = (pandas.DataFrame(list(cluster.degree), columns=['node','degree']).set_index('node'))
-  cluster1_dep = pandas.merge(ccle_dep_crispr_median, 
-                              df1, 
-                              left_index=True, 
+  cluster1_dep = pandas.merge(ccle_dep_crispr_median,
+                              df1,
+                              left_index=True,
                               right_index=True)
   cluster1_dep.index.names = ['node']
   # Degree Centrality: the number of edges a node has
@@ -310,9 +343,9 @@ def plot_cluster_net_depscore(cluster, label, pos, edge_color, node_color):
   degree_names, degree_ranks = zip(*degree.items())
   degree_df = pandas.DataFrame(data={'protein': degree_names, 'rank': degree_ranks})
   degree_df1 = degree_df[degree_df['protein'].isin(cluster1_dep.index)]
-  cluster_degree_depscore = pandas.merge(cluster1_dep, 
-                              degree_df1, 
-                              left_index=True, 
+  cluster_degree_depscore = pandas.merge(cluster1_dep,
+                              degree_df1,
+                              left_index=True,
                               right_on='protein')
   # position of labels above nodes
   pos_higher = {}
@@ -321,19 +354,19 @@ def plot_cluster_net_depscore(cluster, label, pos, edge_color, node_color):
       pos_higher[k] = (v[0]-0.015, v[1]+0.015)
     else:
       pos_higher[k] = (v[0]-0.015, v[1]-0.015)
-  
+
   # color the plot by clusters
-  matplotlib.pyplot.clf()  
+  matplotlib.pyplot.clf()
   matplotlib.pyplot.figure(figsize=(10, 10))
   matplotlib.pyplot.axis('off')
   networkx.draw_networkx(cluster,
-                             pos, 
-                             width= 0.5, 
-                             node_color=node_color, 
+                             pos,
+                             width= 0.5,
+                             node_color=node_color,
                              edge_color=edge_color,
                              node_size=(degree_df['rank'].values*100),
                              label=label,
-                             with_labels = False) 
+                             with_labels = False)
   networkx.draw_networkx_labels(cluster, pos_higher, font_size=3.5)
   matplotlib.pyplot.tight_layout()
   matplotlib.pyplot.savefig(os.path.join(
@@ -341,8 +374,8 @@ def plot_cluster_net_depscore(cluster, label, pos, edge_color, node_color):
       (label + "_network_kk.pdf")),
       dpi=300,
       edgecolor='w',
-      bbox_inches='tight')   
-  matplotlib.pyplot.show()      
+      bbox_inches='tight')
+  matplotlib.pyplot.show()
 
   # color the nodes according to their partition
   partition = community.best_partition(cluster)
@@ -350,14 +383,14 @@ def plot_cluster_net_depscore(cluster, label, pos, edge_color, node_color):
   matplotlib.pyplot.figure(figsize=(10, 10))
   matplotlib.pyplot.axis('off')
   cmap = matplotlib.cm.get_cmap('Set2', max(partition.values()) + 1)
-  networkx.draw_networkx_nodes(cluster, 
-                              pos, nodelist= partition.keys(), 
-                              node_size=degree_df['rank'].values*100, 
+  networkx.draw_networkx_nodes(cluster,
+                              pos, nodelist= partition.keys(),
+                              node_size=degree_df['rank'].values*100,
                               cmap=cmap, node_color = list(partition.values()))
-  networkx.draw_networkx_edges(cluster, 
-                              pos, 
-                              alpha=0.5, 
-                              width= 0.5, 
+  networkx.draw_networkx_edges(cluster,
+                              pos,
+                              alpha=0.5,
+                              width= 0.5,
                               edge_color="#cccccc")
   networkx.draw_networkx_labels(cluster, pos_higher, font_size=3.5)
   matplotlib.pyplot.tight_layout()
@@ -366,7 +399,7 @@ def plot_cluster_net_depscore(cluster, label, pos, edge_color, node_color):
       (label + "_network_community.pdf")),
       dpi=300,
       edgecolor='w',
-      bbox_inches='tight')    
+      bbox_inches='tight')
   matplotlib.pyplot.show()
 
   # color the node by depscores
@@ -376,21 +409,21 @@ def plot_cluster_net_depscore(cluster, label, pos, edge_color, node_color):
   matplotlib.pyplot.clf()
   matplotlib.pyplot.figure(figsize=(10, 10))
   matplotlib.pyplot.axis('off')
-  networkx.draw_networkx(cluster, 
-                         pos, 
-                         width= 0.5, 
-                         edge_color="#cccccc", 
-                         with_labels=False, 
+  networkx.draw_networkx(cluster,
+                         pos,
+                         width= 0.5,
+                         edge_color="#cccccc",
+                         with_labels=False,
                          nodelist=cluster_degree_depscore['protein'],
                          node_size=cluster_degree_depscore['rank'].values*100,
                          node_color=cluster_degree_depscore[0],
-                         cmap=cmap, 
-                         vmin=vmin, 
+                         cmap=cmap,
+                         vmin=vmin,
                          vmax=vmax)
   # networkx.draw_networkx_labels(cluster, pos_higher, font_size=3.5)
   sm = matplotlib.pyplot.cm.ScalarMappable(cmap=cmap, norm=matplotlib.colors.Normalize(vmin=vmin, vmax=vmax))
   sm.set_array([])
-  sub_ax = matplotlib.pyplot.axes([0.90, 0.75, 0.02, 0.2]) 
+  sub_ax = matplotlib.pyplot.axes([0.90, 0.75, 0.02, 0.2])
   cbar = matplotlib.pyplot.colorbar(sm, cax=sub_ax)
   matplotlib.pyplot.tight_layout()
   matplotlib.pyplot.savefig(os.path.join(
@@ -398,19 +431,19 @@ def plot_cluster_net_depscore(cluster, label, pos, edge_color, node_color):
       (label + "_depscore.pdf")),
       dpi=300,
       edgecolor='w',
-      bbox_inches='tight')  
+      bbox_inches='tight')
   matplotlib.pyplot.show()
-      
+
 ##
-plot_cluster_net_depscore(cluster=C1, label = "cluster 1", pos = posC, edge_color = "lightgreen", node_color = "green")  
-plot_cluster_net_depscore(cluster=C2, label = "cluster 2", pos = posC, edge_color = "gold", node_color = "orange")  
-plot_cluster_net_depscore(cluster=C3, label = "cluster 3", pos = posC, edge_color = "skyblue", node_color = "blue")  
-plot_cluster_net_depscore(cluster=C4, label = "cluster 4", pos = posC, edge_color = "pink", node_color = "red")  
+plot_cluster_net_depscore(cluster=C1, label = "cluster 1", pos = posC, edge_color = "lightgreen", node_color = "green")
+plot_cluster_net_depscore(cluster=C2, label = "cluster 2", pos = posC, edge_color = "gold", node_color = "orange")
+plot_cluster_net_depscore(cluster=C3, label = "cluster 3", pos = posC, edge_color = "skyblue", node_color = "blue")
+plot_cluster_net_depscore(cluster=C4, label = "cluster 4", pos = posC, edge_color = "pink", node_color = "red")
 
 
 ##
 def plot_degree_distribution(cluster,pos,label,edge_color,node_color):
-  # PageRank assigns a score of importance to each node. 
+  # PageRank assigns a score of importance to each node.
   # Important nodes are those with many in-links from important pages.
   pagerank = networkx.pagerank(cluster)
   # save the names and their respective scores separately
@@ -429,30 +462,30 @@ def plot_degree_distribution(cluster,pos,label,edge_color,node_color):
   matplotlib.pyplot.axes([0.25,0.25,0.65,0.65])
   matplotlib.pyplot.axis('off')
   networkx.draw_networkx_edges(cluster,
-                           pos,  
-                           width= 0.5, 
-                           edge_color=edge_color, 
-                           connectionstyle="arc3,rad=0.5")                           
-  networkx.draw_networkx_nodes(cluster, 
-  pos, 
-  node_color=node_color, 
-  label=label, 
-  node_size= pagerank_df['rank'].values*10000)    
+                           pos,
+                           width= 0.5,
+                           edge_color=edge_color,
+                           connectionstyle="arc3,rad=0.5")
+  networkx.draw_networkx_nodes(cluster,
+  pos,
+  node_color=node_color,
+  label=label,
+  node_size= pagerank_df['rank'].values*10000)
   matplotlib.pyplot.show()
 
-#plot_degree_distribution(cluster = G, pos= pos, label = "all proteins", edge_color = "grey", node_color = "black")    
-plot_degree_distribution(cluster = C1, pos= posC, label = "cluster 1", edge_color = "lightgreen", node_color = "green")    
-plot_degree_distribution(cluster = C2, pos= posC, label = "cluster 2", edge_color = "gold", node_color = "orange")  
-plot_degree_distribution(cluster = C3, pos= posC, label = "cluster 3", edge_color = "skyblue", node_color = "blue")  
-plot_degree_distribution(cluster = C4, pos= posC, label = "cluster 4", edge_color = "pink", node_color = "red")  
+#plot_degree_distribution(cluster = G, pos= pos, label = "all proteins", edge_color = "grey", node_color = "black")
+plot_degree_distribution(cluster = C1, pos= posC, label = "cluster 1", edge_color = "lightgreen", node_color = "green")
+plot_degree_distribution(cluster = C2, pos= posC, label = "cluster 2", edge_color = "gold", node_color = "orange")
+plot_degree_distribution(cluster = C3, pos= posC, label = "cluster 3", edge_color = "skyblue", node_color = "blue")
+plot_degree_distribution(cluster = C4, pos= posC, label = "cluster 4", edge_color = "pink", node_color = "red")
 
 
 ##
 def plot_depscore_histogram(cluster, pos, label, edge_color, node_color):
   df1 = (pandas.DataFrame(list(cluster.degree), columns=['node','degree']).set_index('node'))
-  cluster1_dep = pandas.merge(ccle_dep_crispr_median, 
-                              df1, 
-                              left_index=True, 
+  cluster1_dep = pandas.merge(ccle_dep_crispr_median,
+                              df1,
+                              left_index=True,
                               right_index=True)
   cluster1_dep.index.names = ['node']
   # Degree Centrality: the number of edges a node has
@@ -462,12 +495,12 @@ def plot_depscore_histogram(cluster, pos, label, edge_color, node_color):
   degree_names, degree_ranks = zip(*degree.items())
   degree_df = pandas.DataFrame(data={'protein': degree_names, 'rank': degree_ranks})
   degree_df1 = degree_df[degree_df['protein'].isin(cluster1_dep.index)]
-  cluster_degree_depscore = pandas.merge(cluster1_dep, 
-                                         degree_df1, 
-                                         left_index=True, 
+  cluster_degree_depscore = pandas.merge(cluster1_dep,
+                                         degree_df1,
+                                         left_index=True,
                                          right_on='protein')
   cluster_degree_depscore.columns = ['depscore', 'degree', 'protein', 'rank']
-  
+
   vmin = ccle_dep_crispr_median[0].min()
   vmax = ccle_dep_crispr_median[0].max()
   cmap = matplotlib.pyplot.cm.coolwarm_r
@@ -475,7 +508,7 @@ def plot_depscore_histogram(cluster, pos, label, edge_color, node_color):
   fig, ax = matplotlib.pyplot.subplots(figsize=(10, 10))
   #seaborn.histplot(data=cluster_degree_depscore, x="depscore", fill=True, binwidth=0.035)
   cluster_degree_depscore['depscore'].hist(
-    bins=80, color="royalblue",    
+    bins=80, color="royalblue",
     grid = False,
     rwidth = 0.9)
   matplotlib.pyplot.title("Depscore histogram " + label)
@@ -485,22 +518,22 @@ def plot_depscore_histogram(cluster, pos, label, edge_color, node_color):
   matplotlib.pyplot.ylim([0, 18])
   matplotlib.pyplot.axes([0.25,0.25,0.65,0.65])
   matplotlib.pyplot.axis('off')
-  networkx.draw_networkx(cluster, 
-                         pos, 
-                         width= 0.5, 
-                         edge_color="#cccccc", 
-                         with_labels=False, 
+  networkx.draw_networkx(cluster,
+                         pos,
+                         width= 0.5,
+                         edge_color="#cccccc",
+                         with_labels=False,
                          nodelist=cluster_degree_depscore['protein'],
                          node_size=cluster_degree_depscore['rank'].values*100,
                          node_color=cluster_degree_depscore["depscore"],
-                         cmap=cmap, 
-                         vmin=ccle_dep_crispr_median[0].min(), 
+                         cmap=cmap,
+                         vmin=ccle_dep_crispr_median[0].min(),
                          vmax=ccle_dep_crispr_median[0].max())
   matplotlib.pyplot.savefig(os.path.join(os.path.expanduser(output_directory),"Fig3", (label + "_Depscore histogram.pdf")),
                       dpi=300,
                       edgecolor='w',
                       #transparent=True,
-                      bbox_inches='tight') 
+                      bbox_inches='tight')
   matplotlib.pyplot.show()
 
   matplotlib.pyplot.clf()
@@ -516,25 +549,25 @@ def plot_depscore_histogram(cluster, pos, label, edge_color, node_color):
   networkx.draw_networkx_edges(cluster,
                              pos=pos,
                              width= 0.5,
-                             edge_color= edge_color)    
+                             edge_color= edge_color)
   networkx.draw_networkx_nodes(cluster, pos=pos,
-                             node_color =node_color, 
+                             node_color =node_color,
                              label=label,
-                             node_size = degree_df['rank'].values*100) 
+                             node_size = degree_df['rank'].values*100)
   matplotlib.pyplot.savefig(os.path.join(os.path.expanduser(output_directory), "Fig3",
   (label + "_Degree histogram.pdf")),
                       dpi=300,
                       edgecolor='w',
                       #transparent=True,
-                      bbox_inches='tight') 
+                      bbox_inches='tight')
   matplotlib.pyplot.show()
 
-#plot_depscore_histogram(cluster = G, pos= pos, label = "all proteins", edge_color = "grey", node_color = "black")    
-plot_depscore_histogram(cluster=C1, pos=posC, label="cluster 1", edge_color="lightgreen", node_color="green")    
-plot_depscore_histogram(cluster=C2, pos=posC, label="cluster 2", edge_color="gold", node_color="orange")  
-plot_depscore_histogram(cluster=C3, pos=posC, label="cluster 3", edge_color="skyblue", node_color="blue")  
-plot_depscore_histogram(cluster=C4, pos=posC, label="cluster 4", edge_color="pink", node_color="red")  
- 
+#plot_depscore_histogram(cluster = G, pos= pos, label = "all proteins", edge_color = "grey", node_color = "black")
+plot_depscore_histogram(cluster=C1, pos=posC, label="cluster 1", edge_color="lightgreen", node_color="green")
+plot_depscore_histogram(cluster=C2, pos=posC, label="cluster 2", edge_color="gold", node_color="orange")
+plot_depscore_histogram(cluster=C3, pos=posC, label="cluster 3", edge_color="skyblue", node_color="blue")
+plot_depscore_histogram(cluster=C4, pos=posC, label="cluster 4", edge_color="pink", node_color="red")
+
 
 ## Histogram and Density Curve for depscores
 def depscore_hisplot(data, method):
@@ -586,7 +619,7 @@ def depscore_hisplot(data, method):
                         dpi=300,
                         edgecolor='w',
                         #transparent=True,
-                        bbox_inches='tight') 
+                        bbox_inches='tight')
   matplotlib.pyplot.show()
 
 depscore_hisplot(data=ccle_dep_crispr, method="CRISPR")
@@ -598,17 +631,17 @@ matplotlib.pyplot.cla()
 matplotlib.pyplot.close()
 
 
-### depmap sensitivity to RNAi 
+### depmap sensitivity to RNAi
 def plot_dep_cnv(protein):
-  result = pandas.merge(ccle_anno[['DepMap_ID', 'CCLE_Name']], 
-                      ccle_cnv[['Unnamed: 0',protein]], 
-                      left_on='DepMap_ID', 
+  result = pandas.merge(ccle_anno[['DepMap_ID', 'CCLE_Name']],
+                      ccle_cnv[['Unnamed: 0',protein]],
+                      left_on='DepMap_ID',
                       right_on='Unnamed: 0',
                       suffixes=('_dep', '_cnv'))
-  dep_cnv = pandas.merge(ccle_dep_rnai[[protein]], 
-                       result[[protein, 'CCLE_Name']], 
-                       left_index=True, 
-                       right_on='CCLE_Name', 
+  dep_cnv = pandas.merge(ccle_dep_rnai[[protein]],
+                       result[[protein, 'CCLE_Name']],
+                       left_index=True,
+                       right_on='CCLE_Name',
                        suffixes=('_dep', '_cnv')).dropna()
 
   g = seaborn.JointGrid(data=dep_cnv, x=(protein+"_dep"), y=(protein+"_cnv"))
