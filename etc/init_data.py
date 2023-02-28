@@ -39,12 +39,12 @@ import sys
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('data_directory',
-                    # '~/Documents/Bioinformatics_analysis/eIF4G-analysis/eIF4G_data',
-                    os.path.join('~', 'Desktop', 'pyeif_data'),
+                    '~/Documents/Bioinformatics_analysis/eIF4G-analysis/eIF4G_data',
+                    #os.path.join('~', 'Desktop', 'pyeif_data'),
                     'parent dir for data files')
 flags.DEFINE_string('output_directory',
-                    # '~/Documents/Bioinformatics_analysis/eIF4G-analysis/eIF4G_output',
-                    os.path.join('~', 'Desktop', 'pyeif_output'),
+                    '~/Documents/Bioinformatics_analysis/eIF4G-analysis/eIF4G_output',
+                    #os.path.join('~', 'Desktop', 'pyeif_output'),
                     'parent dir for output')
 flags.DEFINE_string('cnv_data_by_gene_values',
                     'Gistic2_CopyNumber_Gistic2_all_data_by_genes',

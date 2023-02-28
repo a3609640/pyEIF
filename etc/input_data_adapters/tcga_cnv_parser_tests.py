@@ -2,9 +2,9 @@
 
 from absl.testing import absltest
 
-import org_hs_eg_db_lookup
+from input_data_adapters import org_hs_eg_db_lookup
+from input_data_adapters import tcga_cnv_parser
 import pandas
-import tcga_cnv_parser
 
 
 class UnitTests(absltest.TestCase):
@@ -47,8 +47,11 @@ class UnitTests(absltest.TestCase):
     })
 
     parser = tcga_cnv_parser.TcgaCnvParser(
-      './input_data_adapters/test_data', None, 'threshold-01.csv', None,
-      'phenotype-01.csv')
+      data_directory='./input_data_adapters/test_data', 
+      output_directory=None, 
+      cnv_data_by_gene_thresholds='threshold-01.csv', 
+      cnv_data_by_gene_values=None,
+      cnv_data_phenotypes='phenotype-01.csv')
     joined_data = parser.merge_cnv_thresholds_and_phenotypes()
 
     self.assertTrue(joined_data.equals(expected_joined_data),
