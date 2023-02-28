@@ -19,3 +19,10 @@ py_install("umap", method = "conda", pip = TRUE)
 py_install("heatmap-grammar", method = "conda", pip = TRUE)
 py_install("bioinfokit", method = "conda", pip = TRUE)
 py_install("statannot", method = "conda")
+
+py_install("absl", method = "conda")
+py_install("gseapy", method = "conda", pip = TRUE)
+py_install("plot_likert", method = "conda", pip = TRUE)
+
+
+
